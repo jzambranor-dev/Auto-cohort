@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Auto-cohort local plugin for Moodle 3.5+
+ * Auto-cohort local plugin for Moodle 5.x+
  * @package    local_cohortauto
  * @copyright  2019 Catalyst IT
  * @author     David Thompson <david.thompson@catalyst.net.nz>
@@ -37,15 +37,15 @@ require_once($CFG->dirroot . '/cohort/lib.php');
  * @return array Cleaned array created from $data
  */
 function cohortauto_prepare_profile_data($data, $replaceempty = 'EMPTY') {
-    $reject = array('ajax_updatable_user_prefs', 'sesskey', 'preference', 'editing', 'access', 'message_lastpopup', 'enrol');
-    if (is_array($data) or is_object($data)) {
-        $newdata = array();
+    $reject = ['ajax_updatable_user_prefs', 'sesskey', 'preference', 'editing', 'access', 'message_lastpopup', 'enrol'];
+    if (is_array($data) || is_object($data)) {
+        $newdata = [];
         foreach ($data as $key => $val) {
             if (!in_array($key, $reject)) {
-                if (is_array($val) or is_object($val)) {
+                if (is_array($val) || is_object($val)) {
                     $newdata[$key] = cohortauto_prepare_profile_data($val, $replaceempty);
                 } else {
-                    if ($val === '' or $val === ' ' or $val === null) {
+                    if ($val === '' || $val === ' ' || $val === null) {
                         $str = ($val === false) ? 'false' : $replaceempty;
                     } else {
                         $str = ($val === true) ? 'true' : format_string("$val");
@@ -55,7 +55,7 @@ function cohortauto_prepare_profile_data($data, $replaceempty = 'EMPTY') {
             }
         }
     } else {
-        if ($data === '' or $data === ' ' or $data === null) {
+        if ($data === '' || $data === ' ' || $data === null) {
             $str = ($data === false) ? 'false' : $replaceempty;
         } else {
             $str = ($data === true) ? 'true' : format_string("$data");
@@ -113,17 +113,27 @@ class local_cohortauto_handler {
      */
     const COMPONENT_NAME = 'local_cohortauto';
 
+    /** @var object Plugin configuration. */
+    protected object $config;
+
+    /** @var \Mustache_Engine Mustache template engine. */
+    protected \Mustache_Engine $mustache;
+
     /**
      * Constructor.
      */
     public function __construct() {
         global $CFG;
-        require_once($CFG->dirroot . '/lib/mustache/src/Mustache/Autoloader.php');
 
-        $this->config = get_config(self::COMPONENT_NAME);
-        Mustache_Autoloader::register();
+        // Load Mustache library. In Moodle 5.x the autoloader path is maintained
+        // via lib/thirdpartylibs.xml. Check class availability first.
+        if (!class_exists('Mustache_Autoloader')) {
+            require_once($CFG->dirroot . '/lib/mustache/src/Mustache/Autoloader.php');
+            \Mustache_Autoloader::register();
+        }
 
-        $this->mustache = new Mustache_Engine;
+        $this->config = (object) get_config(self::COMPONENT_NAME);
+        $this->mustache = new \Mustache_Engine();
     }
 
     /**
@@ -132,8 +142,9 @@ class local_cohortauto_handler {
      *
      * @author 2011 Andrew "Kama" (kamasutra12@yandex.ru) in auth_mcae
      * @param object $config The configuration object.
+     * @return bool
      */
-    public function process_config($config) {
+    public function process_config($config): bool {
         // Set to defaults if undefined.
 
         if (!isset($config->mainrule_fld)) {
@@ -179,100 +190,109 @@ class local_cohortauto_handler {
     public function user_profile_hook(&$user) {
         global $DB;
 
-        $context = context_system::instance();
+        $context = \context_system::instance();
         $uid = $user->id;
         // Ignore users from don't_touch list.
-        $ignore = explode(",", $this->config->donttouchusers);
+        $donttouchusers = $this->config->donttouchusers ?? '';
+        $ignore = explode(",", $donttouchusers);
 
         // Skip explicitly ignored users.
-        if (!empty($ignore) AND array_search($user->username, $ignore) !== false) {
+        if (!empty($ignore) && array_search($user->username, $ignore) !== false) {
             return;
-        };
+        }
 
         // Ignore guests.
         if (isguestuser($user)) {
             return;
-        };
+        }
 
         // Get cohorts.
-        $params = array(
+        $params = [
             'contextid' => $context->id,
-        );
-        if ($this->config->enableunenrol == 1) {
+        ];
+        if (!empty($this->config->enableunenrol)) {
             $params['component'] = self::COMPONENT_NAME;
-        };
+        }
 
         $cohorts = $DB->get_records('cohort', $params);
 
-        $cohortslist = array();
+        $cohortslist = [];
         foreach ($cohorts as $cohort) {
-            $cohortslist[$cohort->id] = format_string($cohort->name);;
+            $cohortslist[$cohort->id] = format_string($cohort->name);
         }
 
         // Get advanced user data.
         profile_load_data($user);
         profile_load_custom_fields($user);
-        $userprofiledata = cohortauto_prepare_profile_data($user, $this->config->secondrule_fld);
+        $secondrule = $this->config->secondrule_fld ?? 'n/a';
+        $userprofiledata = cohortauto_prepare_profile_data($user, $secondrule);
 
         // Additional values for email.
-        list($emailusername, $emaildomain) = explode("@", $userprofiledata['email']);
+        if (!empty($userprofiledata['email']) && str_contains($userprofiledata['email'], '@')) {
+            list($emailusername, $emaildomain) = explode("@", $userprofiledata['email']);
 
-        // Email root domain.
-        $emaildomainarray = explode('.', $emaildomain);
-        if (count($emaildomainarray) > 2) {
-            $emailrootdomain = $emaildomainarray[count($emaildomainarray) - 2].'.'.
-                               $emaildomainarray[count($emaildomainarray) - 1];
-        } else {
-            $emailrootdomain = $emaildomain;
+            // Email root domain.
+            $emaildomainarray = explode('.', $emaildomain);
+            if (count($emaildomainarray) > 2) {
+                $emailrootdomain = $emaildomainarray[count($emaildomainarray) - 2] . '.' .
+                                   $emaildomainarray[count($emaildomainarray) - 1];
+            } else {
+                $emailrootdomain = $emaildomain;
+            }
+            $userprofiledata['email'] = [
+                'full' => $userprofiledata['email'],
+                'username' => $emailusername,
+                'domain' => $emaildomain,
+                'rootdomain' => $emailrootdomain,
+            ];
         }
-        $userprofiledata['email'] = array(
-            'full' => $userprofiledata['email'],
-            'username' => $emailusername,
-            'domain' => $emaildomain,
-            'rootdomain' => $emailrootdomain
-        );
 
         // Set delimiter in use.
-        $delimiter = $this->config->delim;
-        $delim = strtr($delimiter, array('CR+LF' => chr(13).chr(10), 'CR' => chr(13), 'LF' => chr(10)));
+        $delimiter = $this->config->delim ?? 'CR+LF';
+        $delim = strtr($delimiter, ['CR+LF' => chr(13).chr(10), 'CR' => chr(13), 'LF' => chr(10)]);
 
         // Calculate cohort names for user.
-        $replacementstemplate = $this->config->replace_arr;
+        $replacementstemplate = $this->config->replace_arr ?? '';
 
-        $replacements = array();
+        $replacements = [];
         if (!empty($replacementstemplate)) {
             $replacementsarray = explode($delim, $replacementstemplate);
             foreach ($replacementsarray as $replacement) {
-                list($key, $val) = explode("|", $replacement);
-                $replacements[$key] = $val;
-            };
-        };
+                $parts = explode("|", $replacement);
+                if (count($parts) === 2) {
+                    $replacements[$parts[0]] = $parts[1];
+                }
+            }
+        }
 
         // Generate cohort array.
-        $mainrule = $this->config->mainrule_fld;
-        $mainrulearray = array();
-        $templates = array();
+        $mainrule = $this->config->mainrule_fld ?? '';
+        $mainrulearray = [];
+        $templates = [];
         if (!empty($mainrule)) {
             $mainrulearray = explode($delim, $mainrule);
         } else {
             return; // Empty mainrule; no further processing to do.
-        };
+        }
 
         // Find %split function.
         foreach ($mainrulearray as $item) {
             if (preg_match('/(?<full>%split\((?<fld>\w*)\|(?<delim>.{1,5})\))/', $item, $splitparams)) {
                 // Split!
-                $parts = explode($splitparams['delim'], $userprofiledata[$splitparams['fld']]);
-                foreach ($parts as $key => $val) {
-                    $userprofiledata[$splitparams['fld']."_$key"] = $val;
-                    $templates[] = strtr($item, array("{$splitparams['full']}" => "{{ ".$splitparams['fld']."_$key }}"));
+                $splitfield = $splitparams['fld'];
+                if (isset($userprofiledata[$splitfield])) {
+                    $parts = explode($splitparams['delim'], $userprofiledata[$splitfield]);
+                    foreach ($parts as $key => $val) {
+                        $userprofiledata[$splitfield . "_$key"] = $val;
+                        $templates[] = strtr($item, ["{$splitparams['full']}" => "{{ " . $splitfield . "_$key }}"]);
+                    }
                 }
             } else {
                 $templates[] = $item;
             }
         }
 
-        $processed = array();
+        $processed = [];
 
         // Apply templates and process the user's cohort memberships.
         foreach ($templates as $cohort) {
@@ -284,53 +304,53 @@ class local_cohortauto_handler {
             // Skip empty cohort names. Users with no cohort name should not be assigned.
             if ($cohortname == '') {
                 continue;
-            };
+            }
 
             $cid = array_search($cohortname, $cohortslist);
             if ($cid !== false) {
-                if (!$DB->record_exists('cohort_members', array('cohortid' => $cid, 'userid' => $user->id))) {
+                if (!$DB->record_exists('cohort_members', ['cohortid' => $cid, 'userid' => $user->id])) {
                     cohort_add_member($cid, $user->id);
-                };
+                }
             } else {
                 // Cohort with this name does not exist, so create a new one.
-                $newcohort = new stdClass();
+                $newcohort = new \stdClass();
                 $newcohort->name = $cohortname;
-                $newcohort->description = "created ".date("d-m-Y");
+                $newcohort->description = "created " . date("d-m-Y");
                 $newcohort->contextid = $context->id;
                 $newcohort->idnumber = '';
-                if ($this->config->enableunenrol == 1) {
+                if (!empty($this->config->enableunenrol)) {
                     $newcohort->component = self::COMPONENT_NAME;
-                };
+                }
                 $cid = cohort_add_cohort($newcohort);
                 // Add new cohort into the list to avoid creating new ones with same name.
                 $cohortslist[$cid] = $cohortname;
                 // Add user to the new cohort.
                 cohort_add_member($cid, $user->id);
 
-            };
+            }
             $processed[] = $cid;
-        };
+        }
 
         // Remove users from cohorts if necessary.
-        if ($this->config->enableunenrol == 1) {
+        if (!empty($this->config->enableunenrol)) {
             // List of cohorts, managed by this plugin, where the user is a member.
             $sql = "SELECT DISTINCT c.id AS cid
                       FROM {cohort} c
                       JOIN {cohort_members} cm ON cm.cohortid = c.id
                     WHERE c.component = :component AND cm.userid = :userid";
-            $params = array(
+            $params = [
                 'component' => self::COMPONENT_NAME,
                 'userid' => $uid,
-            );
+            ];
             $incohorts = $DB->get_records_sql($sql, $params);
 
             foreach ($incohorts as $target) {
                 // Remove membership if it no longer matches a processed cohort.
                 if (array_search($target->cid, $processed) === false) {
                     cohort_remove_member($target->cid, $uid);
-                };
-            };
-        };
+                }
+            }
+        }
     }
 
 }

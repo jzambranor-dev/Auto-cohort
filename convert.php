@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Auto-cohort local plugin for Moodle 3.5+
+ * Auto-cohort local plugin for Moodle 5.x+
  * @package    local_cohortauto
  * @copyright  2019 Catalyst IT
  * @author     David Thompson <david.thompson@catalyst.net.nz>
@@ -39,27 +39,27 @@ require_capability('moodle/site:config', $context, $USER->id);
 
 // Fetch parameters.
 $action = optional_param('action', 'list', PARAM_ALPHA);
-$clist = (isset($_POST['clist'])) ? $_POST['clist'] : false;
+$clist = optional_param_array('clist', [], PARAM_INT);
 
 switch ($action) {
     case 'list':
-        $cohorts = $DB->get_records('cohort', array('contextid' => $context->id), 'name ASC');
-        $cohortlist = array();
+        $cohorts = $DB->get_records('cohort', ['contextid' => $context->id], 'name ASC');
+        $cohortlist = [];
 
         foreach ($cohorts as $cohort) {
             $cid = $cohort->id;
             $cname = format_string($cohort->name);
             $cohortlist[$cid]['name'] = $cname;
             $cohortlist[$cid]['component'] = $cohort->component;
-            $cohortlist[$cid]['count'] = $DB->count_records('cohort_members', array('cohortid' => $cid));
+            $cohortlist[$cid]['count'] = $DB->count_records('cohort_members', ['cohortid' => $cid]);
         }
 
-        $row = array();
-        $cell = array();
+        $row = [];
+        $cell = [];
         $rownum = 0;
 
         foreach ($cohortlist as $key => $val) {
-            $viewurl = new moodle_url('/local/cohortauto/view.php', array('cid' => $key));
+            $viewurl = new moodle_url('/local/cohortauto/view.php', ['cid' => $key]);
             $row[$rownum] = new html_table_row();
 
             switch ($val['component']) {
@@ -88,12 +88,12 @@ switch ($action) {
         }
 
         $table = new html_table();
-        $table->head = array(
+        $table->head = [
             get_string('heading_cohortname', 'local_cohortauto'),
             get_string('heading_component', 'local_cohortauto'),
             get_string('heading_count', 'local_cohortauto'),
-            get_string('heading_link', 'local_cohortauto')
-        );
+            get_string('heading_link', 'local_cohortauto'),
+        ];
         $table->width = '60%';
         $table->data = $row;
 
@@ -102,6 +102,7 @@ switch ($action) {
 
         echo get_string('cohortoper_help', 'local_cohortauto');
         echo "<form action=\"{$returnurl}\" method=\"POST\">";
+        echo '<input type="hidden" name="sesskey" value="'.sesskey().'">';
 
         echo html_writer::table($table);
 
@@ -117,20 +118,23 @@ switch ($action) {
         echo $OUTPUT->footer();
     break;
     case 'do':
+        require_sesskey();
         if ($clist) {
             list($usql, $params) = $DB->get_in_or_equal($clist);
             $DB->set_field_select('cohort', 'component', 'local_cohortauto', 'id ' . $usql, $params);
-        };
+        }
         redirect($returnurl);
     break;
     case 'restore':
+        require_sesskey();
         if ($clist) {
             list($usql, $params) = $DB->get_in_or_equal($clist);
             $DB->set_field_select('cohort', 'component', '', 'id ' . $usql, $params);
-        };
+        }
         redirect($returnurl);
     break;
     case 'delete':
+        require_sesskey();
         if ($clist) {
             set_time_limit(0);
 
@@ -143,12 +147,14 @@ switch ($action) {
             $delcurrent = 1;
 
             foreach ($clist as $cid) {
-                $cohort = $DB->get_record('cohort', array('contextid' => $context->id, 'id' => $cid));
-                cohort_delete_cohort($cohort);
+                $cohort = $DB->get_record('cohort', ['contextid' => $context->id, 'id' => $cid]);
+                if ($cohort) {
+                    cohort_delete_cohort($cohort);
+                }
                 $progress->update($delcurrent, $delcount, "{$delcurrent} / {$delcount}");
                 $delcurrent++;
-            };
-        };
+            }
+        }
         echo $OUTPUT->continue_button($returnurl);
         echo $OUTPUT->footer();
         die();
@@ -156,6 +162,7 @@ switch ($action) {
     default:
         redirect($returnurl,
             get_string('error_unknown_action', 'local_cohortauto', $action),
+            null,
             \core\output\notification::NOTIFY_ERROR
         );
 }
