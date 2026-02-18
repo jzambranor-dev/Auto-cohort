@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Auto-cohort local plugin for Moodle 3.5+
+ * Auto-cohort local plugin for Moodle 5.x+
  * @package    local_cohortauto
  * @copyright  2019 Catalyst IT
  * @author     David Thompson <david.thompson@catalyst.net.nz>
@@ -24,12 +24,13 @@
 
 defined('MOODLE_INTERNAL') || die;
 
-$observers = array (
-    array(
+$observers = [
+    [
         'eventname' => '\core\event\user_created',
-        'callback' => 'local_cohortauto_observer::user_created'
-    ),
-    array(
+        'callback'  => '\local_cohortauto\observer::user_created',
+    ],
+    [
         'eventname' => '\core\event\user_updated',
-        'callback' => 'local_cohortauto_observer::user_updated'
-    ));
+        'callback'  => '\local_cohortauto\observer::user_updated',
+    ],
+];

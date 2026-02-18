@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Auto-cohort local plugin for Moodle 3.5+
+ * Auto-cohort local plugin for Moodle 5.x+
  * @package    local_cohortauto
  * @copyright  2019 Catalyst IT
  * @author     David Thompson <david.thompson@catalyst.net.nz>
@@ -24,8 +24,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2019073000;
+$plugin->version   = 2026021800;
 $plugin->component = 'local_cohortauto';
-$plugin->maturity  = MATURITY_BETA;
-$plugin->requires  = 2018051700;
-$plugin->release   = '1.0';
+$plugin->maturity  = MATURITY_STABLE;
+$plugin->requires  = 2024100700;
+$plugin->release   = '2.0.0';

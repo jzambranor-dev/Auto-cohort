@@ -15,12 +15,14 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Auto-cohort local plugin for Moodle 3.5+
+ * Auto-cohort local plugin for Moodle 5.x+
  * @package    local_cohortauto
  * @copyright  2019 Catalyst IT
  * @author     David Thompson <david.thompson@catalyst.net.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+
+namespace local_cohortauto;
 
 defined('MOODLE_INTERNAL') || die;
 
@@ -32,17 +34,18 @@ defined('MOODLE_INTERNAL') || die;
  * @copyright  2019 Catalyst IT
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class local_cohortauto_observer {
+class observer {
     /**
      * Observer function to handle the user created event
      * @param \core\event\user_created $event
+     * @return void
      */
-    public static function user_created(\core\event\user_created $event) {
+    public static function user_created(\core\event\user_created $event): void {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/local/cohortauto/lib.php');
         $eventdata = $event->get_data();
-        $handler = new local_cohortauto_handler();
-        if ($user = $DB->get_record('user', array('id' => $eventdata['relateduserid']))) {
+        $handler = new \local_cohortauto_handler();
+        if ($user = $DB->get_record('user', ['id' => $eventdata['relateduserid']])) {
             $handler->user_profile_hook($user);
         }
     }
@@ -50,13 +53,14 @@ class local_cohortauto_observer {
     /**
      * Observer function to handle the user updated event
      * @param \core\event\user_updated $event
+     * @return void
      */
-    public static function user_updated(\core\event\user_updated $event) {
+    public static function user_updated(\core\event\user_updated $event): void {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/local/cohortauto/lib.php');
         $eventdata = $event->get_data();
-        $handler = new local_cohortauto_handler();
-        if ($user = $DB->get_record('user', array('id' => $eventdata['relateduserid']))) {
+        $handler = new \local_cohortauto_handler();
+        if ($user = $DB->get_record('user', ['id' => $eventdata['relateduserid']])) {
             $handler->user_profile_hook($user);
         }
     }

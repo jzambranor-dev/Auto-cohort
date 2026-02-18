@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Auto-cohort local plugin for Moodle 3.5+
+ * Auto-cohort local plugin for Moodle 5.x+
  * @package    local_cohortauto
  * @copyright  2019 Catalyst IT
  * @author     David Thompson <david.thompson@catalyst.net.nz>
@@ -76,7 +76,7 @@ $return = new moodle_url('/local/cohortauto/view.php');
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('viewcohort', 'local_cohortauto'));
 
-echo '<form action="'.$return.'" method="POST"><select name="cid">';
+echo '<form action="'.$return.'" method="GET"><select name="cid">';
 echo $selectoptions;
 echo '<input type="submit"></form><br />';
 

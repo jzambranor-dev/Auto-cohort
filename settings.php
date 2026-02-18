@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Auto-cohort local plugin for Moodle 3.5+
+ * Auto-cohort local plugin for Moodle 5.x+
  * @package    local_cohortauto
  * @copyright  2019 Catalyst IT
  * @author     David Thompson <david.thompson@catalyst.net.nz>
@@ -23,8 +23,6 @@
  */
 
 defined('MOODLE_INTERNAL') || die;
-
-global $USER;
 
 require_once($CFG->dirroot.'/user/profile/lib.php');
 require_once($CFG->dirroot.'/local/cohortauto/lib.php');
