@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Auto-cohort local plugin for Moodle 5.x+
+ * Auto-cohort local plugin for Moodle 5.0+ (5.0.6 and 5.1.1+ compatible)
  * @package    local_cohortauto
  * @copyright  2019 Catalyst IT
  * @author     David Thompson <david.thompson@catalyst.net.nz>
@@ -125,11 +125,20 @@ class local_cohortauto_handler {
     public function __construct() {
         global $CFG;
 
-        // Load Mustache library. In Moodle 5.x the autoloader path is maintained
-        // via lib/thirdpartylibs.xml. Check class availability first.
+        // Load Mustache library. Path varies between Moodle versions (5.0.x vs 5.1.x).
+        // Check class availability first; Composer autoloader may have already loaded it.
         if (!class_exists('Mustache_Autoloader')) {
-            require_once($CFG->dirroot . '/lib/mustache/src/Mustache/Autoloader.php');
-            \Mustache_Autoloader::register();
+            $mustachepaths = [
+                $CFG->dirroot . '/lib/mustache/src/Mustache/Autoloader.php',
+                $CFG->dirroot . '/vendor/mustache/mustache/src/Mustache/Autoloader.php',
+            ];
+            foreach ($mustachepaths as $path) {
+                if (file_exists($path)) {
+                    require_once($path);
+                    \Mustache_Autoloader::register();
+                    break;
+                }
+            }
         }
 
         $this->config = (object) get_config(self::COMPONENT_NAME);
